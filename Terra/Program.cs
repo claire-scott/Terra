@@ -95,8 +95,8 @@ namespace Terra
             GL.EnableVertexAttribArray(vertPositionAtt);
             GL.EnableVertexAttribArray(vertColourAtt);
 
-            GL.DrawArrays(BeginMode.Triangles, 0, 3);
-            //GL.DrawElements(BeginMode.Triangles,3,DrawElementsType.
+            //GL.DrawArrays(BeginMode.Triangles, 0, 3);
+            GL.DrawElements(BeginMode.Triangles,3,DrawElementsType.
 
             GL.DisableVertexAttribArray(vertPositionAtt);
             GL.DisableVertexAttribArray(vertColourAtt);
