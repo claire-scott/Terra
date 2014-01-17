@@ -3,168 +3,114 @@ using System.Drawing;
 using OpenTK;
 using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
-using OpenTK.Input;
-using System.IO;
 
-namespace Terra
+namespace OpenTKUniformVariables
 {
-
-    class Game : GameWindow
+    class Program : GameWindow
     {
-        int programId;
+        string vertexShaderSource = @"
+#version 330
+ 
+layout (location = 0) in vec3 Position;
+ 
+uniform float scale;
+ 
+void main()
+{
+	gl_Position = vec4(scale * Position.x,
+	                   scale * Position.y,
+	                   Position.z, 1.0);
+}";
 
-        int vertShaderId;
-        int fragShaderId;
+        string fragmentShaderSource = @"
+#version 330
+ 
+out vec4 FragColor;
+ 
+void main()
+{
+	FragColor = vec4(0.5, 0.8, 1.0, 1.0);
+}";
 
-        int vertColourAtt;
-        int vertPositionAtt;
-        int uniformMView;
 
-        int vbo_position;
-        int vbo_color;
-        int vbo_mview;
+        int vbo,
+            shaderProgramHandle, vertexShaderHandle, fragmentShaderHandle;
 
-        Vector3[] vertdata;
-        Vector3[] coldata;
-        Matrix4[] mviewdata;
+        int uniformScale;
+        float variableScale;
 
-        void initProgram()
+        double time;
+
+        void CreateVertexBuffer()
         {
-            programId = GL.CreateProgram();
+            Vector3[] vertices = new Vector3[3];
+            vertices[0] = new Vector3(-1f, -1f, 0f);
+            vertices[1] = new Vector3(1f, -1f, 0f);
+            vertices[2] = new Vector3(0f, 1f, 0f);
 
-            loadShader("vs.glsl", ShaderType.VertexShader, programId, out vertShaderId);
-            loadShader("fs.glsl", ShaderType.FragmentShader, programId, out fragShaderId);
-
-            GL.LinkProgram(programId);
-            Console.WriteLine(GL.GetProgramInfoLog(programId));
-
-            vertPositionAtt = GL.GetAttribLocation(programId, "vPosition");
-            vertColourAtt = GL.GetAttribLocation(programId, "vColor");
-            uniformMView = GL.GetUniformLocation(programId, "modelView");
-
-            if(vertPositionAtt == -1 || vertColourAtt == -1 || uniformMView == -1)
-            {
-                Console.WriteLine("Error binding attributes");
-            }
-
-            GL.GenBuffers(1, out vbo_position);
-            GL.GenBuffers(1, out vbo_color);
-            GL.GenBuffers(1, out vbo_mview);
+            GL.GenBuffers(1, out vbo);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
+            GL.BufferData<Vector3>(BufferTarget.ArrayBuffer,
+                                   new IntPtr(vertices.Length * Vector3.SizeInBytes),
+                                   vertices, BufferUsageHint.StaticDraw);
         }
 
+        void CreateShaders()
+        {
+            shaderProgramHandle = GL.CreateProgram();
+
+            vertexShaderHandle = GL.CreateShader(ShaderType.VertexShader);
+            fragmentShaderHandle = GL.CreateShader(ShaderType.FragmentShader);
+
+            GL.ShaderSource(vertexShaderHandle, vertexShaderSource);
+            GL.ShaderSource(fragmentShaderHandle, fragmentShaderSource);
+
+            GL.CompileShader(vertexShaderHandle);
+            GL.CompileShader(fragmentShaderHandle);
+            Console.WriteLine(GL.GetShaderInfoLog(vertexShaderHandle));
+            Console.WriteLine(GL.GetShaderInfoLog(fragmentShaderHandle));
+
+            GL.AttachShader(shaderProgramHandle, vertexShaderHandle);
+            GL.AttachShader(shaderProgramHandle, fragmentShaderHandle);
+            GL.LinkProgram(shaderProgramHandle);
+            Console.WriteLine(GL.GetProgramInfoLog(shaderProgramHandle));
+            GL.UseProgram(shaderProgramHandle);
+
+            uniformScale = GL.GetUniformLocation(shaderProgramHandle, "scale");
+        }
 
         protected override void OnLoad(EventArgs e)
         {
-            base.OnLoad(e);
-
-            initProgram();
-
-            vertdata = new Vector3[] { 
-                new Vector3(-0.8f, -0.8f, 0f),
-                new Vector3( 0.8f, -0.8f, 0f),
-                new Vector3( 0f,  0.8f, 0f)};
-
-
-            coldata = new Vector3[] { 
-                new Vector3(1f, 0f, 0f),
-                new Vector3( 0f, 0f, 1f),
-                new Vector3( 0f,  1f, 0f)};
-
-
-            mviewdata = new Matrix4[]{
-                Matrix4.Identity
-            };
-
-
-
-
-            Title = "Hello OpenTK";
-            GL.ClearColor(Color.CornflowerBlue);
-            VSync = VSyncMode.On;
+            GL.ClearColor(Color.Brown);
+            CreateVertexBuffer();
+            CreateShaders();
         }
 
         protected override void OnRenderFrame(FrameEventArgs e)
         {
-            base.OnRenderFrame(e);
+            GL.Clear(ClearBufferMask.ColorBufferBit);
 
-            // render graphics
-            GL.Viewport(0, 0, Width, Height);
-            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-            GL.Enable(EnableCap.DepthTest);
+            time = (time >= Math.PI) ? 0.0 : time + e.Time;
 
-            GL.EnableVertexAttribArray(vertPositionAtt);
-            GL.EnableVertexAttribArray(vertColourAtt);
+            variableScale = (float)(Math.Sin(time));
+            GL.Uniform1(uniformScale, variableScale);
 
-            //GL.DrawArrays(BeginMode.Triangles, 0, 3);
-            GL.DrawElements(BeginMode.Triangles,3,DrawElementsType.
+            GL.EnableVertexAttribArray(0);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 0, 0);
 
-            GL.DisableVertexAttribArray(vertPositionAtt);
-            GL.DisableVertexAttribArray(vertColourAtt);
+            GL.DrawArrays(BeginMode.Triangles, 0, 3);
 
-            GL.Flush();
+            GL.DisableVertexAttribArray(0);
 
             SwapBuffers();
         }
 
-        protected override void OnResize(EventArgs e)
+        public static void Main()
         {
-            base.OnResize(e);
-
-            GL.Viewport(ClientRectangle.X, ClientRectangle.Y, ClientRectangle.Width, ClientRectangle.Height);
-            Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView((float)Math.PI / 4, Width / (float)Height, 1.0f, 64.0f);
-            GL.MatrixMode(MatrixMode.Projection);
-            GL.LoadMatrix(ref projection);
-        }
-
-        protected override void OnUpdateFrame(FrameEventArgs e)
-        {
-            base.OnUpdateFrame(e);
-
-            // add game logic, input handling
-            if (Keyboard[Key.Escape])
+            using (Program p = new Program())
             {
-                Exit();
-            }
-
-            GL.BindBuffer(BufferTarget.ArrayBuffer, vbo_position);
-            GL.BufferData<Vector3>(BufferTarget.ArrayBuffer, (IntPtr)(vertdata.Length * Vector3.SizeInBytes), vertdata, BufferUsageHint.StaticDraw);
-            GL.VertexAttribPointer(vertPositionAtt, 3, VertexAttribPointerType.Float, false, 0, 0);
-
-            GL.BindBuffer(BufferTarget.ArrayBuffer, vbo_color);
-            GL.BufferData<Vector3>(BufferTarget.ArrayBuffer, (IntPtr)(coldata.Length * Vector3.SizeInBytes), coldata,BufferUsageHint.StaticDraw);
-            GL.VertexAttribPointer(vertColourAtt, 3, VertexAttribPointerType.Float, true, 0, 0);
-
-            GL.UniformMatrix4(uniformMView, false, ref mviewdata[0]);
-
-            GL.UseProgram(programId);
-
-            GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
-        }
-
-        void loadShader(String filename,ShaderType type, int program, out int address)
-        {
-            address = GL.CreateShader(type);
-            using (StreamReader sr = new StreamReader(filename))
-            {
-                GL.ShaderSource(address, sr.ReadToEnd());
-            }
-            GL.CompileShader(address);
-            GL.AttachShader(program, address);
-            Console.WriteLine(GL.GetShaderInfoLog(address));
-        }
-
-    }
-
-
-
-    class Program
-    {
-        static void Main(string[] args)
-        {
-            using (Game game = new Game())
-            {
-                // Run the game at 60 updates per second
-                game.Run(30.0);
+                p.Run(60);
             }
         }
     }
